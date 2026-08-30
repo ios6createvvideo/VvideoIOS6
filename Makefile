@@ -19,11 +19,10 @@
 # ---------------------------------------------------------------
 #  Имя твика/приложения
 # ---------------------------------------------------------------
-TARGET := iphone:clang:6.1:6.1
-ARCHS := armv7
+TARGET ?= iphone:clang:6.0:6.0
+ARCHS ?= armv7
 
-# Пакет — обычное приложение (не твик).
-ADDITIONAL_OBJCFLAGS = -fobjc-arc
+ADDITIONAL_OBJCFLAGS = -fno-objc-arc -Wno-deprecated-declarations
 INSTALL_TARGET_PROCESSES = VKVideoLegacy
 
 include $(THEOS)/makefiles/common.mk
@@ -42,8 +41,7 @@ VKVideoLegacy_FRAMEWORKS = UIKit Foundation MediaPlayer QuartzCore CoreGraphics
 # Настройка Info.plist (любые ключи — дисплейное имя и пр.).
 VKVideoLegacy_PLIST = VKVideoLegacy-Info.plist
 
-# Функции для iOS 6 прошивки.
-VKVideoLegacy_CFLAGS = -fobjc-arc
+VKVideoLegacy_CFLAGS = -fno-objc-arc -Wno-deprecated-declarations
 
 # ---------------------------------------------------------------
 #  Сборка
