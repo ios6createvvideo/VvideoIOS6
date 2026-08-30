@@ -1,0 +1,40 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Theos & SDK
+        run: |
+          git clone --recursive https://github.com/theos/theos.git ~/theos
+          echo "THEOS=~/theos" >> $GITHUB_ENV
+          curl -LO https://github.com/theos/sdks/archive/master.zip
+          unzip -q master.zip
+          mv sdks-master/* ~/theos/sdks/
+
+      - name: Compile Application
+        run: |
+          export THEOS=~/theos
+          make clean
+          make package FINALPACKAGE=1 TARGET=iphone:clang:6.1:6.0 CODE_SIGNING_ALLOWED=NO || make package FINALPACKAGE=1 CODE_SIGNING_ALLOWED=NO
+
+      - name: Create IPA
+        run: |
+          mkdir -p Payload
+          find .theos/obj -name "*.app" -exec cp -r {} Payload/ \;
+          mkdir -p packages
+          zip -r packages/VKVideoLegacy.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VKVideo-iOS6-App
+          path: packages/*.ipa
