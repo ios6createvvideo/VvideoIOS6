@@ -78,6 +78,8 @@
     [_receivedData release];
     [_items release];
     [_spinner release];
+    [_searchBar release];
+    [_tableView release];
     [serverBaseURL release];
     [super dealloc];
 }
@@ -166,14 +168,15 @@
 // ----------------------------------------------------------------
 - (void)performSearchWithQuery:(NSString *)query
 {
-    // Отменяем предыдущее незавершённое соединение.
+    if (!query || [query length] == 0) {
+        return;
+    }
+
     [_connection cancel];
     [_connection release];
     _connection = nil;
     [_receivedData setLength:0];
 
-    // Формируем URL: http://<host>:8080/api/search?q=<query>
-    // Кодируем строку запроса для URL (проценто-кодирование).
     NSString *encodedQuery = (NSString *)
         CFURLCreateStringByAddingPercentEscapes(
             NULL,
@@ -181,21 +184,25 @@
             NULL,
             (CFStringRef)@"!*'();:@&=+$,/?%#[]",
             kCFStringEncodingUTF8);
+    if (!encodedQuery) {
+        return;
+    }
+
     NSString *urlString = [NSString stringWithFormat:@"%@/api/search?q=%@",
                            self.serverBaseURL, encodedQuery];
-    [encodedQuery release]; // CFRelease — освобождаем
+    [encodedQuery release];
 
     NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) {
+        return;
+    }
 
-    // Собираем запрос.
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setTimeoutInterval:15.0];
     [request setCachePolicy:NSURLRequestReloadIgnoringLocalCacheData];
 
-    // Показываем индикатор.
     [_spinner startAnimating];
 
-    // Начинаем асинхронную загрузку.
     _connection = [[NSURLConnection alloc] initWithRequest:request
                                                   delegate:self
                                           startImmediately:YES];
@@ -243,11 +250,17 @@
 
             VideoItem *item = [[VideoItem alloc] init];
             item.title    = [dict objectForKey:@"title"];
-            item.duration = [dict objectForKey:@"duration"];
+            id durationVal = [dict objectForKey:@"duration"];
+            if ([durationVal isKindOfClass:[NSString class]]) {
+                item.duration = durationVal;
+            } else if ([durationVal respondsToSelector:@selector(stringValue)]) {
+                item.duration = [durationVal stringValue];
+            } else {
+                item.duration = @"";
+            }
             item.photo    = [dict objectForKey:@"photo"];
             item.url      = [dict objectForKey:@"url"];
 
-            // Защита: не добавляем пустые элементы без ссылки.
             if (item.url && [item.url length] > 0) {
                 [_items addObject:item];
             }
@@ -324,12 +337,11 @@
 
     VideoItem *item = [_items objectAtIndex:indexPath.row];
 
-    // --- Настройка текста ---
     cell.textLabel.text = item.title;
-    cell.textLabel.numberOfLines = 2;               // до 2 строк
-    cell.textLabel.lineBreakMode = UILineBreakModeTailTruncation;
+    cell.textLabel.numberOfLines = 2;
+    cell.textLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     cell.textLabel.font = [UIFont boldSystemFontOfSize:14.0f];
-    cell.textLabel.textColor = [UIColor whiteColor]; // читаемо на тёмном фоне
+    cell.textLabel.textColor = [UIColor whiteColor];
 
     // --- Длительность (серым мелким шрифтом) ---
     cell.detailTextLabel.text = item.duration;
@@ -373,8 +385,7 @@
     }
     cell.imageView.image = placeholder;
 
-    // --- Асинхронная загрузка по URL на фоновом потоке (GCD) ---
-    NSString *photoURL = item.photo;
+    NSString *photoURL = [item.photo copy];
     dispatch_queue_t bgQueue = dispatch_get_global_queue(
         DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
     dispatch_async(bgQueue, ^{
@@ -383,15 +394,15 @@
         if (data) {
             UIImage *img = [UIImage imageWithData:data];
             if (img) {
-                // Сохраняем в кэш.
                 [[ViewController thumbnailCache] setObject:img
                                                     forKey:photoURL];
-                // Возвращаемся на главный поток, чтобы обновить UI.
                 dispatch_async(dispatch_get_main_queue(), ^{
                     cell.imageView.image = img;
+                    [cell setNeedsLayout];
                 });
             }
         }
+        [photoURL release];
     });
 }
 
@@ -418,36 +429,30 @@
     }
 
     NSURL *url = [NSURL URLWithString:mediaURL];
+    if (!url) {
+        return;
+    }
 
-    // --- Создаём нативный плеер iOS 6 ---
-    // MPMoviePlayerViewController — полноэкранный системный плеер
-    // со встроенными контроллерами перемотки, громкости и кнопкой «Готово».
     MPMoviePlayerViewController *movieVC =
         [[MPMoviePlayerViewController alloc] initWithContentURL:url];
 
-    // --- Подписка на уведомление о завершении ---
-    // Наблюдатель убирается в обработчике.
     [[NSNotificationCenter defaultCenter]
         addObserver:self
            selector:@selector(moviePlayerDidExit:)
-               name:MPMoviePlayerDidExitFullscreenNotification
+               name:MPMoviePlayerPlaybackDidFinishNotification
              object:movieVC.moviePlayer];
 
-    // --- Разворачиваем на весь экран ---
-    [self presentViewController:movieVC animated:YES completion:NULL];
+    [self presentMoviePlayerViewControllerAnimated:movieVC];
 
-    // Запуск воспроизведения.
     [movieVC.moviePlayer play];
     [movieVC release];
 }
 
-// Обработчик выхода из полноэкранного режима плеера.
 - (void)moviePlayerDidExit:(NSNotification *)notification
 {
-    // Снимаем наблюдателя, чтобы не было утечки.
     [[NSNotificationCenter defaultCenter]
         removeObserver:self
-                  name:MPMoviePlayerDidExitFullscreenNotification
+                  name:MPMoviePlayerPlaybackDidFinishNotification
                 object:[notification object]];
 }
 
