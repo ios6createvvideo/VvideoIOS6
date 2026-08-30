@@ -1,8 +1,15 @@
 name: Build IPA
-on: push: branches: - main - master workflow_dispatch:
-jobs: build: runs-on: macos-latest
+
+on: 
+push: 
+branches: 
+main - 
+master workflow_dispatch:
+jobs: 
+build: 
+runs-on: macos-latest
 steps:
-  - name: Checkout code
+  - name: Checkout
     uses: actions/checkout@v4
 
   - name: Install Theos
@@ -12,48 +19,40 @@ steps:
 
   - name: Install iOS SDKs
     run: |
-      if [ -d "$HOME/theos/sdks/.git" ]; then
-        cd "$HOME/theos/sdks"
-        git pull
-      else
-        rm -rf "$HOME/theos/sdks"
-        git clone --depth 1 https://github.com/theos/sdks.git "$HOME/theos/sdks"
-      fi
+      rm -rf "$HOME/theos/sdks"
+      git clone --depth 1 https://github.com/theos/sdks.git "$HOME/theos/sdks"
 
   - name: Build
     run: |
       export THEOS="$HOME/theos"
-
       make clean || true
-
       make package \
         FINALPACKAGE=1 \
         CODE_SIGNING_ALLOWED=NO \
         TARGET="iphone:clang:6.0:6.0"
 
-  - name: Find built application
+  - name: Find application
     run: |
       mkdir -p Payload
-
       APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
 
       if [ -z "$APP_PATH" ]; then
         echo "ERROR: .app was not found"
-        find .theos -maxdepth 5 -type f | head -100
+        find .theos -maxdepth 5 -print | head -100
         exit 1
       fi
 
-      echo "Found: $APP_PATH"
       cp -R "$APP_PATH" Payload/
 
   - name: Create IPA
     run: |
       mkdir -p packages
-      /usr/bin/zip -r "packages/VKVideoLegacy.ipa" Payload
+      cd Payload
+      zip -r "../packages/VKVideoLegacy.ipa" .
+      cd ..
 
   - name: Upload IPA
     uses: actions/upload-artifact@v4
     with:
       name: VKVideo-iOS6-App
       path: packages/VKVideoLegacy.ipa
-
