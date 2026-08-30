@@ -1,4 +1,3 @@
-
 name: Build IPA
 
 on:
@@ -23,7 +22,10 @@ jobs:
       - name: Install iOS SDKs
         run: |
           rm -rf "$HOME/theos/sdks"
-          git clone --depth 1 https://github.com/theos/sdks.git "$HOME/theos/sdks"
+          mkdir -p "$HOME/theos/sdks"
+          git clone --depth 1 https://github.com/Sn0wCooder/theos-sdks.git /tmp/theos-sdks
+          cp -R /tmp/theos-sdks/iPhoneOS6.0.sdk "$HOME/theos/sdks/"
+          cp -R /tmp/theos-sdks/iPhoneOS6.1.sdk "$HOME/theos/sdks/"
 
       - name: Build
         run: |
