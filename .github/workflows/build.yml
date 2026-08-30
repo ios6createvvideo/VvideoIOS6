@@ -21,8 +21,8 @@ jobs:
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 - name: Install iOS SDKs
     run: |
-      rm -rf $HOME/theos/sdks
-      git clone https://github.com/theos/sdks.git $HOME/theos/sdks
+      rm -rf "$HOME/theos/sdks"
+      git clone --depth 1 https://github.com/theos/sdks.git "$HOME/theos/sdks"
 
       - name: Build
         run: |
