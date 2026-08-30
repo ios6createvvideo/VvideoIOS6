@@ -9,15 +9,43 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            fakeroot \
+            git \
+            curl \
+            perl \
+            rsync \
+            zip \
+            unzip \
+            libxml2 \
+            libtinfo6 || true
+          sudo apt-get install -y libtinfo5 || true
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5 2>/dev/null || true
 
       - name: Install Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Install Toolchain
+        run: |
+          mkdir -p "$HOME/theos/toolchain"
+          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJvf - -C "$HOME/theos/toolchain/"
+          chmod -R +x "$HOME/theos/toolchain/linux/iphone/bin"
+
+      - name: Install iOS 6 SDK
+        run: |
+          mkdir -p "$HOME/theos/sdks"
+          git clone --depth=1 https://github.com/Alex1s/iPhoneOS6.0.sdk.git "$HOME/theos/sdks/iPhoneOS6.0.sdk"
 
       - name: Build
         run: |
@@ -26,13 +54,16 @@ jobs:
           make package \
             FINALPACKAGE=1 \
             CODE_SIGNING_ALLOWED=NO \
-            TARGET="iphone:clang:latest:6.0" \
+            TARGET="iphone:clang:6.0:6.0" \
             ARCHS="armv7"
 
-      - name: Find application
+      - name: Create IPA
         run: |
-          mkdir -p Payload
-          APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
+          mkdir -p Payload packages
+          APP_PATH=$(find .theos/_/Applications -type d -name "*.app" 2>/dev/null | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
+          fi
 
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: .app was not found"
@@ -41,13 +72,7 @@ jobs:
           fi
 
           cp -R "$APP_PATH" Payload/
-
-      - name: Create IPA
-        run: |
-          mkdir -p packages
-          cd Payload
-          zip -r "../packages/VKVideoLegacy.ipa" .
-          cd ..
+          zip -r packages/VKVideoLegacy.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
