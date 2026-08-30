@@ -25,7 +25,7 @@
 // Главный контроллер экрана.
 @interface ViewController : UIViewController
     <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate,
-     MPMoviePlayerViewControllerDelegate, NSURLConnectionDataDelegate>
+     NSURLConnectionDelegate, NSURLConnectionDataDelegate>
 {
     // Поле ввода поиска, закреплённое над таблицей.
     UISearchBar *_searchBar;
