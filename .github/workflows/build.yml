@@ -2,39 +2,61 @@ name: Build IPA
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Theos & SDK
+      - name: Install Theos
         run: |
-          git clone --recursive https://github.com/theos/theos.git ~/theos
-          echo "THEOS=~/theos" >> $GITHUB_ENV
-          curl -LO https://github.com/theos/sdks/archive/master.zip
-          unzip -q master.zip
-          mv sdks-master/* ~/theos/sdks/
+          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
-      - name: Compile Application
+      - name: Install iOS SDKs
         run: |
-          export THEOS=~/theos
-          make clean
-          make package FINALPACKAGE=1 TARGET=iphone:clang:6.1:6.0 CODE_SIGNING_ALLOWED=NO || make package FINALPACKAGE=1 CODE_SIGNING_ALLOWED=NO
+          git clone https://github.com/theos/sdks.git "$HOME/theos/sdks"
+
+      - name: Build
+        run: |
+          export THEOS="$HOME/theos"
+
+          make clean || true
+
+          make package \
+            FINALPACKAGE=1 \
+            CODE_SIGNING_ALLOWED=NO \
+            TARGET="iphone:clang:6.0:6.0"
+
+      - name: Find built application
+        run: |
+          mkdir -p Payload
+
+          APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: .app was not found"
+            find .theos -maxdepth 5 -type f | head -100
+            exit 1
+          fi
+
+          echo "Found: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
 
       - name: Create IPA
         run: |
-          mkdir -p Payload
-          find .theos/obj -name "*.app" -exec cp -r {} Payload/ \;
           mkdir -p packages
-          zip -r packages/VKVideoLegacy.ipa Payload
+          /usr/bin/zip -r "packages/VKVideoLegacy.ipa" Payload
 
-      - name: Upload Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: VKVideo-iOS6-App
-          path: packages/*.ipa
+          path: packages/VKVideoLegacy.ipa
