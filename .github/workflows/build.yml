@@ -1,26 +1,17 @@
+
 name: Build IPA
+on: push: branches: - main - master workflow_dispatch:
+jobs: build: runs-on: macos-latest
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v4
 
-on:
-  push:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
+  - name: Install Theos
+    run: |
+      git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
+      echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
-jobs:
-  build:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
-
-- name: Install iOS SDKs
+  - name: Install iOS SDKs
     run: |
       if [ -d "$HOME/theos/sdks/.git" ]; then
         cd "$HOME/theos/sdks"
@@ -29,39 +20,40 @@ jobs:
         rm -rf "$HOME/theos/sdks"
         git clone --depth 1 https://github.com/theos/sdks.git "$HOME/theos/sdks"
       fi
-      - name: Build
-        run: |
-          export THEOS="$HOME/theos"
 
-          make clean || true
+  - name: Build
+    run: |
+      export THEOS="$HOME/theos"
 
-          make package \
-            FINALPACKAGE=1 \
-            CODE_SIGNING_ALLOWED=NO \
-            TARGET="iphone:clang:6.0:6.0"
+      make clean || true
 
-      - name: Find built application
-        run: |
-          mkdir -p Payload
+      make package \
+        FINALPACKAGE=1 \
+        CODE_SIGNING_ALLOWED=NO \
+        TARGET="iphone:clang:6.0:6.0"
 
-          APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
+  - name: Find built application
+    run: |
+      mkdir -p Payload
 
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app was not found"
-            find .theos -maxdepth 5 -type f | head -100
-            exit 1
-          fi
+      APP_PATH=$(find .theos -type d -name "*.app" | head -n 1)
 
-          echo "Found: $APP_PATH"
-          cp -R "$APP_PATH" Payload/
+      if [ -z "$APP_PATH" ]; then
+        echo "ERROR: .app was not found"
+        find .theos -maxdepth 5 -type f | head -100
+        exit 1
+      fi
 
-      - name: Create IPA
-        run: |
-          mkdir -p packages
-          /usr/bin/zip -r "packages/VKVideoLegacy.ipa" Payload
+      echo "Found: $APP_PATH"
+      cp -R "$APP_PATH" Payload/
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: VKVideo-iOS6-App
-          path: packages/VKVideoLegacy.ipa
+  - name: Create IPA
+    run: |
+      mkdir -p packages
+      /usr/bin/zip -r "packages/VKVideoLegacy.ipa" Payload
+
+  - name: Upload IPA
+    uses: actions/upload-artifact@v4
+    with:
+      name: VKVideo-iOS6-App
+      path: packages/VKVideoLegacy.ipa
