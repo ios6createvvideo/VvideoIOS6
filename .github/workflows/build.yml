@@ -1,4 +1,3 @@
-
 name: Build IPA
 on: push: branches: - main - master workflow_dispatch:
 jobs: build: runs-on: macos-latest
@@ -57,3 +56,4 @@ steps:
     with:
       name: VKVideo-iOS6-App
       path: packages/VKVideoLegacy.ipa
+
