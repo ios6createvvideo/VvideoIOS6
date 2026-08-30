@@ -19,14 +19,6 @@ jobs:
           git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
-      - name: Install iOS SDKs
-        run: |
-          rm -rf "$HOME/theos/sdks"
-          mkdir -p "$HOME/theos/sdks"
-          git clone --depth 1 https://github.com/Sn0wCooder/theos-sdks.git /tmp/theos-sdks
-          cp -R /tmp/theos-sdks/iPhoneOS6.0.sdk "$HOME/theos/sdks/"
-          cp -R /tmp/theos-sdks/iPhoneOS6.1.sdk "$HOME/theos/sdks/"
-
       - name: Build
         run: |
           export THEOS="$HOME/theos"
@@ -34,7 +26,8 @@ jobs:
           make package \
             FINALPACKAGE=1 \
             CODE_SIGNING_ALLOWED=NO \
-            TARGET="iphone:clang:6.0:6.0"
+            TARGET="iphone:clang:latest:6.0" \
+            ARCHS="armv7"
 
       - name: Find application
         run: |
